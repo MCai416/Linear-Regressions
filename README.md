@@ -2,6 +2,7 @@
 
 OLS and Ridge Regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (1975). 
 
+Estimations of variables are based on: Econometric Theory and Methods, Davidson and Mackinnon (2004)
 
 Please install the preliminary library required. I used anaconda 3 - spyder 3 as IDE, which included all of them. 
 
