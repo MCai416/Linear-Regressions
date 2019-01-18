@@ -1,11 +1,12 @@
-# Ridge-Regression
-
-please install the preliminary library required. I used anaconda 3 - spyder 3 as IDE. 
-
-copy the file to your directory and then type 
-import Ridge
+# Ridge Regression
 
 OLS and Ridge Regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (1975). 
+
+
+{lease install the preliminary library required. I used anaconda 3 - spyder 3 as IDE. 
+
+copy the file to your directory and then type: 
+import Ridge
 
 First create an OLS or Ridge Type object, then use object.reg() for output on your console. 
 
