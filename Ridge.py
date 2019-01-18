@@ -32,12 +32,12 @@ def clearNaN(DataFrameY, DataFrameX):
             DataFrameY = DataFrameY.drop([l-i-1])
     return DataFrameY, DataFrameX
 
-def lag(df, l, name = None):
+def lag(df, l):
     X = np.array(df.values, dtype = float)
     ldf = np.roll(X, l, 0)
     for i in range(l):
         ldf[i] = np.NaN
-    return pd.DataFrame(ldf, columns = [name])
+    return pd.DataFrame(ldf, columns = df.columns)
 
 class OLS(object):
     def __init__(self, y, X, nocons = True):
