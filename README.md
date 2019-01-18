@@ -1,5 +1,7 @@
 # Ridge-Regression
 
+please install the preliminary library required. I used anaconda 3 - spyder 3 as IDE. 
+
 copy the file to your directory and then type 
 import Ridge
 
@@ -22,6 +24,8 @@ Standard ridge regression does not include and F-test, because it is meaningless
 Test function is there to do F-test under Homoskedasticity. Takes 4 arguments: y, X, null, and k.
 
 "null" is the restricted model that you want to test. Please input constant if you want the standard test. Otherwise please specify your restricted model. And X would be your unrestricted model. K is the bias you would like to include. 
+
+lag function is basically there to create lag values for time series analysis returns the dataframe of the lagged value. 
 
 Please contact me by 
 cai.ming@live.com 
