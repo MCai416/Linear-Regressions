@@ -20,7 +20,7 @@ Default OLS and Ridge has no constant, please add in a column of constant in you
 
 To use ridge, please use getK first, this is a function to retrieve the best bias/Minimum MSE estimated K value from the two papers. 
 Ridge takes four arguments. The third argument is the k value you want to input. Then the last one set "nocons = False"
-Standard ridge regression does not include and F-test, because it is meaningless. 
+Standard ridge regression does not include F-test, because it is meaningless. 
 
 Test function is there to do F-test under Homoskedasticity. Takes 4 arguments: y, X, null, and k.
 
