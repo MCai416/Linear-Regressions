@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jan 15 14:43:18 2019
-
-@author: Ming Cai
-"""
-
-# -*- coding: utf-8 -*-
-"""
 Created on Sun Dec 23 11:14:15 2018
 
 @author: Ming Cai
@@ -22,15 +15,6 @@ import pandas as pd
 
 mpl.rcParams['font.size'] = 30
 pd.options.display.float_format = '{:,.4g}'.format
-
-path = "C:/Users/Ming Cai/OneDrive/University of Edinburgh/Year 4/Commissioned Dissertation/Ekimetrics Data/"
-
-file = "PCA Ridge test with Client data.xlsx"
-
-df = pd.read_excel(path + file)
-
-dfA = df.iloc[:,138:146]
-dfy = df.iloc[:,4]
 
 #####################################################################
 def clearNaN(DataFrameY, DataFrameX):
