@@ -5,7 +5,7 @@ OLS and Ridge Regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, B
 
 Please install the preliminary library required. I used anaconda 3 - spyder 3 as IDE, which included all of them. 
 
-copy the file to your directory and then type: 
+copy the files to your directory and then type: 
 import Ridge
 
 First create an OLS or Ridge Type object, then use object.reg() for output on your console. 
