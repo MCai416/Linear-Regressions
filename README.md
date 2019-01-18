@@ -3,7 +3,7 @@
 OLS and Ridge Regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (1975). 
 
 
-{lease install the preliminary library required. I used anaconda 3 - spyder 3 as IDE. 
+Please install the preliminary library required. I used anaconda 3 - spyder 3 as IDE, which included all of them. 
 
 copy the file to your directory and then type: 
 import Ridge
