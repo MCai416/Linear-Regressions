@@ -56,7 +56,7 @@ def lag(df, l, name = None):
     return pd.DataFrame(ldf, columns = [name])
 
 class OLS(object):
-    def __init__(self, y, X, nocons = True, vce = "hc1"):
+    def __init__(self, y, X, nocons = True, vce = "None"):
         y, X = clearNaN(y, X)
         self.depname = y.name
         self.nocons = nocons
