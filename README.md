@@ -36,3 +36,7 @@ lag function is basically there to create lag values for time series analysis re
 Please contact me by 
 cai.ming@live.com 
 if you have any questions. 
+
+----------------------------
+Jan 24 Update: 
+Supports HC1 and HC2 Robust Standard Errors
