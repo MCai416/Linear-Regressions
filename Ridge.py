@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Tue Jan 15 14:43:18 2019
+
+@author: Ming Cai
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Sun Dec 23 11:14:15 2018
 
 @author: Ming Cai
@@ -15,6 +22,15 @@ import pandas as pd
 
 mpl.rcParams['font.size'] = 30
 pd.options.display.float_format = '{:,.4g}'.format
+
+path = "C:/Users/Ming Cai/OneDrive/University of Edinburgh/Year 4/Commissioned Dissertation/Ekimetrics Data/"
+
+file = "PCA Ridge test with Client data.xlsx"
+
+df = pd.read_excel(path + file)
+
+dfA = df.iloc[:,138:146]
+dfy = df.iloc[:,4]
 
 #####################################################################
 def clearNaN(DataFrameY, DataFrameX):
@@ -32,15 +48,15 @@ def clearNaN(DataFrameY, DataFrameX):
             DataFrameY = DataFrameY.drop([l-i-1])
     return DataFrameY, DataFrameX
 
-def lag(df, l):
+def lag(df, l, name = None):
     X = np.array(df.values, dtype = float)
     ldf = np.roll(X, l, 0)
     for i in range(l):
         ldf[i] = np.NaN
-    return pd.DataFrame(ldf, columns = df.columns)
+    return pd.DataFrame(ldf, columns = [name])
 
 class OLS(object):
-    def __init__(self, y, X, nocons = True):
+    def __init__(self, y, X, nocons = True, vce = "hc1"):
         y, X = clearNaN(y, X)
         self.depname = y.name
         self.nocons = nocons
@@ -58,9 +74,28 @@ class OLS(object):
         self.b = self.VarX @ self.CovXy
         self.df = np.trace(self.Mx)
         self.u_hat = self.dep - m(self.X, self.b)
+        self.u1 = self.u_hat.reshape(len(self.u_hat), 1)
+        self.u2 = self.u_hat**2
         self.SSR = t(self.u_hat) @ self.u_hat
-        self.SE = self.SSR/float(self.df)
-        self.Varb = self.SE * self.VarX
+        self.SE = self.SSR/float(self.df)            
+        if vce == "robust":
+            self.Xu = self.X * self.u1
+            self.XohmX = np.ndarray([self.l, self.l])
+            for i in range(self.l):
+                for j in range(self.l):
+                    self.XohmX[i][j] = self.Xu[:,i] @ self.Xu[:,j] * self.n/self.df
+            self.Varb = self.VarX @ self.XohmX @ self.VarX
+        elif vce == "hc2":
+            self.XohmX = np.ndarray([self.l, self.l])
+            self.u2r = self.u2/np.diag(self.Mx)
+            self.u2r = self.u2r.reshape(self.n, 1)
+            self.Xu = self.X * self.u2r
+            for i in range(self.l):
+                for j in range(self.l):
+                    self.XohmX[i][j] = self.X[:,i] @ self.Xu[:,j]
+            self.Varb = self.VarX @ self.XohmX @ self.VarX
+        else: #default 
+            self.Varb = self.SE * self.VarX
         self.SEb = np.sqrt(self.Varb)
         if nocons == False:
             self.ypred = m(self.X, self.b) - np.mean(self.dep)
@@ -146,7 +181,7 @@ class OLS(object):
         
         
 class Ridge(object):
-    def __init__(self, y, X, k = 0, nocons = True):
+    def __init__(self, y, X, k = 0, nocons = True, vce = "None"):
         y, X = clearNaN(y, X)
         self.depname = y.name
         self.nocons = nocons
@@ -169,7 +204,24 @@ class Ridge(object):
         self.u_hat = self.dep - m(self.X, self.b)
         self.SSR = t(self.u_hat) @ self.u_hat
         self.SE = self.SSR/float(self.df)
-        self.Varb = self.SE * self.VarX
+        if vce == "robust":
+            self.Xu = self.X * self.u1
+            self.XohmX = np.ndarray([self.l, self.l])
+            for i in range(self.l):
+                for j in range(self.l):
+                    self.XohmX[i][j] = self.Xu[:,i] @ self.Xu[:,j] * self.n/self.df
+            self.Varb = self.VarX @ self.XohmX @ self.VarX
+        elif vce == "hc2":
+            self.XohmX = np.ndarray([self.l, self.l])
+            self.u2r = self.u2/np.diag(self.Mx)
+            self.u2r = self.u2r.reshape(self.n, 1)
+            self.Xu = self.X * self.u2r
+            for i in range(self.l):
+                for j in range(self.l):
+                    self.XohmX[i][j] = self.X[:,i] @ self.Xu[:,j]
+            self.Varb = self.VarX @ self.XohmX @ self.VarX
+        else: #default 
+            self.Varb = self.SE * self.VarX
         self.SEb = np.sqrt(self.Varb)
         if nocons == False:
             self.ypred = m(self.X, self.b) - np.mean(self.dep)
