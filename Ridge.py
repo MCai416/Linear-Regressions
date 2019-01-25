@@ -56,7 +56,7 @@ def lag(df, l, name = None):
     return pd.DataFrame(ldf, columns = [name])
 
 class OLS(object):
-    def __init__(self, y, X, nocons = True, vce = "None"):
+    def __init__(self, y, X, nocons = False, vce = None, cluster = None):
         y, X = clearNaN(y, X)
         self.depname = y.name
         self.nocons = nocons
@@ -77,26 +77,48 @@ class OLS(object):
         self.u1 = self.u_hat.reshape(len(self.u_hat), 1)
         self.u2 = self.u_hat**2
         self.SSR = t(self.u_hat) @ self.u_hat
-        self.SE = self.SSR/float(self.df)            
-        if vce == "robust":
-            self.Xu = self.X * self.u1
-            self.XohmX = np.ndarray([self.l, self.l])
-            for i in range(self.l):
-                for j in range(self.l):
-                    self.XohmX[i][j] = self.Xu[:,i] @ self.Xu[:,j] * self.n/self.df
-            self.Varb = self.VarX @ self.XohmX @ self.VarX
-        elif vce == "hc2":
-            self.XohmX = np.ndarray([self.l, self.l])
-            self.u2r = self.u2/np.diag(self.Mx)
-            self.u2r = self.u2r.reshape(self.n, 1)
-            self.Xu = self.X * self.u2r
-            for i in range(self.l):
-                for j in range(self.l):
-                    self.XohmX[i][j] = self.X[:,i] @ self.Xu[:,j]
-            self.Varb = self.VarX @ self.XohmX @ self.VarX
-        else: #default 
-            self.Varb = self.SE * self.VarX
-        self.SEb = np.sqrt(self.Varb)
+        self.SE = self.SSR/float(self.df)
+        self.Varb = self.SE * self.VarX #default
+        if vce == None:
+            vce = ""
+        if vce.upper() == "ROBUST":
+            self.u2 = self.u2*self.n/self.df
+            self.ohm = np.zeros([self.n,self.n])
+            for i in range(self.n):
+               self.ohm[i][i] = self.u2[i]
+            self.XOX = self.Xt @ self.ohm @ self.X
+            self.Varb = self.VarX @ self.XOX @ self.VarX
+        if vce.upper() == "HC2":
+            self.u2 = self.u2/np.diag(self.Mx)
+            self.ohm = np.zeros([self.n,self.n])
+            for i in range(self.n):
+               self.ohm[i][i] = self.u2[i]
+            self.XOX = self.Xt @ self.ohm @ self.X
+            if np.all(cluster) != None:
+                for i in range(self.l):
+                    for j in range(self.l):
+                        if cluster.iloc[i] != cluster.iloc[j]:
+                            self.XOX[i][j] = 0
+            self.Varb = self.VarX @ self.XOX @ self.VarX
+        if np.any(cluster) != None:
+            ncl = len(np.unique(cluster))
+            self.ohm = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
+            if np.all(cluster) != None:
+                print("Cluster ID Retrieved!")
+                for i in range(self.n):
+                    for j in range(self.n):
+                        if cluster.iloc[i] != cluster.iloc[j]:
+                            self.ohm[i][j] = 0
+            else:
+                print("Incomplete Cluster ID!")
+                print("HC1 Assumed")
+                self.u2 = self.u2*self.n/self.df
+                self.ohm = np.zeros([self.n,self.n])
+                for i in range(self.n):
+                    self.ohm[i][i] = self.u2[i]
+            self.XOX = self.Xt @ self.ohm @ self.X
+            self.Varb = self.VarX @ self.XOX @ self.VarX
+        self.SEb = np.sqrt(np.diag(self.Varb))
         if nocons == False:
             self.ypred = m(self.X, self.b) - np.mean(self.dep)
             self.ESS = t(self.ypred) @ self.ypred
@@ -108,7 +130,7 @@ class OLS(object):
         self.ts = np.zeros(len(self.b))
         self.pvalue = np.zeros(len(self.b))
         for j in range(len(self.b)):
-            self.ts[j] = self.b[j]/self.SEb[j][j]
+            self.ts[j] = self.b[j]/self.SEb[j]
             self.pvalue[j] = 2*ss.t.cdf(-abs(self.ts[j]), self.df)
         self.Mx = (np.identity(self.n) - self.Px)
         self.SSR1 = t(self.dep) @ self.Mx @ self.dep
@@ -146,9 +168,9 @@ class OLS(object):
             self.mout[j, 0] = self.b[j]
             self.mout[j, 2] = self.ts[j]
             self.mout[j, 3] = self.pvalue[j]
-            #self.mout[j, 4] = self.b[j] - self.t95*self.SEb[j][j]
-            #self.mout[j, 5] = self.b[j] + self.t95*self.SEb[j][j]
-            self.mout[j, 1] = self.SEb[j][j]
+            #self.mout[j, 4] = self.b[j] - self.t95*self.SEb[j]
+            #self.mout[j, 5] = self.b[j] + self.t95*self.SEb[j]
+            self.mout[j, 1] = self.SEb[j]
             if self.pvalue[j] < 0.001:
                 self.mout[j, 4] = 0.001
             if self.pvalue[j] < 0.01:
@@ -181,7 +203,7 @@ class OLS(object):
         
         
 class Ridge(object):
-    def __init__(self, y, X, k = 0, nocons = True, vce = "None"):
+    def __init__(self, y, X, k = 0, nocons = False, vce = None, cluster = None):
         y, X = clearNaN(y, X)
         self.depname = y.name
         self.nocons = nocons
@@ -202,27 +224,51 @@ class Ridge(object):
         self.bOLS = self.VarXOLS @ self.CovXy
         self.df = np.trace(self.Mx)
         self.u_hat = self.dep - m(self.X, self.b)
+        self.u1 = self.u_hat.reshape(self.n, 1)
+        self.u2 = self.u_hat**2
         self.SSR = t(self.u_hat) @ self.u_hat
         self.SE = self.SSR/float(self.df)
-        if vce == "robust":
-            self.Xu = self.X * self.u1
-            self.XohmX = np.ndarray([self.l, self.l])
-            for i in range(self.l):
-                for j in range(self.l):
-                    self.XohmX[i][j] = self.Xu[:,i] @ self.Xu[:,j] * self.n/self.df
-            self.Varb = self.VarX @ self.XohmX @ self.VarX
-        elif vce == "hc2":
-            self.XohmX = np.ndarray([self.l, self.l])
-            self.u2r = self.u2/np.diag(self.Mx)
-            self.u2r = self.u2r.reshape(self.n, 1)
-            self.Xu = self.X * self.u2r
-            for i in range(self.l):
-                for j in range(self.l):
-                    self.XohmX[i][j] = self.X[:,i] @ self.Xu[:,j]
-            self.Varb = self.VarX @ self.XohmX @ self.VarX
-        else: #default 
-            self.Varb = self.SE * self.VarX
-        self.SEb = np.sqrt(self.Varb)
+        self.Varb = self.SE * self.VarX #default
+        if vce == None:
+            vce = ""
+        if vce.upper() == "ROBUST":
+            self.u2 = self.u2*self.n/self.df
+            self.ohm = np.zeros([self.n,self.n])
+            for i in range(self.n):
+               self.ohm[i][i] = self.u2[i]
+            self.XOX = self.Xt @ self.ohm @ self.X
+            self.Varb = self.VarX @ self.XOX @ self.VarX
+        if vce.upper() == "HC2":
+            self.u2 = self.u2/np.diag(self.Mx)
+            self.ohm = np.zeros([self.n,self.n])
+            for i in range(self.n):
+               self.ohm[i][i] = self.u2[i]
+            self.XOX = self.Xt @ self.ohm @ self.X
+            if np.all(cluster) != None:
+                for i in range(self.l):
+                    for j in range(self.l):
+                        if cluster.iloc[i] != cluster.iloc[j]:
+                            self.XOX[i][j] = 0
+            self.Varb = self.VarX @ self.XOX @ self.VarX
+        if np.any(cluster) != None:
+            ncl = len(np.unique(cluster))
+            self.ohm = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
+            if np.all(cluster) != None:
+                print("Cluster ID Retrieved!")
+                for i in range(self.n):
+                    for j in range(self.n):
+                        if cluster.iloc[i] != cluster.iloc[j]:
+                            self.ohm[i][j] = 0
+            else:
+                print("Incomplete Cluster ID!")
+                print("HC1 Assumed")
+                self.u2 = self.u2*self.n/self.df
+                self.ohm = np.zeros([self.n,self.n])
+                for i in range(self.n):
+                    self.ohm[i][i] = self.u2[i]
+            self.XOX = self.Xt @ self.ohm @ self.X
+            self.Varb = self.VarX @ self.XOX @ self.VarX
+        self.SEb = np.sqrt(np.diag(self.Varb))
         if nocons == False:
             self.ypred = m(self.X, self.b) - np.mean(self.dep)
             self.ESS = t(self.ypred) @ self.ypred
@@ -234,7 +280,7 @@ class Ridge(object):
         self.ts = np.zeros(len(self.b))
         self.pvalue = np.zeros(len(self.b))
         for j in range(len(self.b)):
-            self.ts[j] = self.b[j]/self.SEb[j][j]
+            self.ts[j] = self.b[j]/self.SEb[j]
             self.pvalue[j] = 2*ss.t.cdf(-abs(self.ts[j]), self.df)
         self.Mx = (np.identity(self.n) - self.Px)
         self.SSR1 = t(self.dep) @ self.Mx @ self.dep
@@ -272,9 +318,9 @@ class Ridge(object):
             self.mout[j, 0] = self.b[j]
             self.mout[j, 2] = self.ts[j]
             self.mout[j, 3] = self.pvalue[j]
-            #self.mout[j, 4] = self.b[j] - self.t95*self.SEb[j][j]
-            #self.mout[j, 5] = self.b[j] + self.t95*self.SEb[j][j]
-            self.mout[j, 1] = self.SEb[j][j]
+            #self.mout[j, 4] = self.b[j] - self.t95*self.SEb[j]
+            #self.mout[j, 5] = self.b[j] + self.t95*self.SEb[j]
+            self.mout[j, 1] = self.SEb[j]
             if self.pvalue[j] < 0.001:
                 self.mout[j, 4] = 0.001
             if self.pvalue[j] < 0.01:
