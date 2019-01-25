@@ -1,8 +1,12 @@
 # Ridge Regression
 
-OLS and Ridge Regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (1975). 
+Ridge Regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (1975). 
 
 Estimations of variables are based on: Econometric Theory and Methods, Davidson and Mackinnon (2004)
+
+This is a substitute to STATA not being able to perform Ridge. Although there are packages available but Python is still more flexible than STATA, especially when you want to relax for heteroskedasticity, do more flexible tests etc. 
+
+Also you can access to all the estimations, from residuals to the Omega matrix. 
 
 Please install the preliminary library required. I used anaconda 3/spyder 3 as IDE, which included all of them. 
 
@@ -38,5 +42,10 @@ cai.ming@live.com
 if you have any questions. 
 
 ----------------------------
-Jan 24 Update: 
+Jan 24: 
+
 Supports HC1 and HC2 Robust Standard Errors
+
+Jan 25:
+
+Supports clustered standard errors
