@@ -23,15 +23,6 @@ import pandas as pd
 mpl.rcParams['font.size'] = 30
 pd.options.display.float_format = '{:,.4g}'.format
 
-path = "C:/Users/Ming Cai/OneDrive/University of Edinburgh/Year 4/Commissioned Dissertation/Ekimetrics Data/"
-
-file = "PCA Ridge test with Client data.xlsx"
-
-df = pd.read_excel(path + file)
-
-dfA = df.iloc[:,138:146]
-dfy = df.iloc[:,4]
-
 #####################################################################
 def clearNaN(DataFrameY, DataFrameX):
     l = len(DataFrameY)
