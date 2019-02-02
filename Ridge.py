@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Tue Jan 15 14:43:18 2019
+
+@author: Ming Cai
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Sun Dec 23 11:14:15 2018
 
 @author: Ming Cai
@@ -12,6 +19,7 @@ from numpy import transpose as t
 import matplotlib as mpl
 import scipy.stats as ss
 import pandas as pd
+from numpy.linalg import eigh
 
 mpl.rcParams['font.size'] = 30
 pd.options.display.float_format = '{:,.4g}'.format
@@ -44,7 +52,6 @@ class OLS(object):
         y, X = clearNaN(y, X)
         self.depname = y.name
         self.nocons = nocons
-        self.X0 = X
         self.n = len(y)
         self.l = X.shape[1]
         self.dep = np.array(y.values, dtype = float)
@@ -78,21 +85,47 @@ class OLS(object):
             for i in range(self.n):
                self.ohm[i][i] = self.u2[i]
             self.XOX = self.Xt @ self.ohm @ self.X
-            if np.all(cluster) != None:
-                for i in range(self.l):
-                    for j in range(self.l):
-                        if cluster.iloc[i] != cluster.iloc[j]:
-                            self.XOX[i][j] = 0
             self.Varb = self.VarX @ self.XOX @ self.VarX
         if np.any(cluster) != None:
-            ncl = len(np.unique(cluster))
-            self.ohm = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
             if np.all(cluster) != None:
                 print("Cluster ID Retrieved!")
-                for i in range(self.n):
-                    for j in range(self.n):
-                        if cluster.iloc[i] != cluster.iloc[j]:
-                            self.ohm[i][j] = 0
+                if cluster.shape[1] == 1:
+                    ncl = len(np.unique(cluster))
+                    self.ohm = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
+                    for i in range(self.n):
+                        for j in range(self.n):
+                            if np.all(cluster.iloc[i] != cluster.iloc[j]):
+                                self.ohm[i][j] = 0
+                elif cluster.shape[1] == 2:
+                    print("Twoway clustering: ", cluster.columns)
+                    ncl1 = len(np.unique(cluster.iloc[:,0]))
+                    ncl2 = len(np.unique(cluster.iloc[:,1]))
+                    ncl12 = len(np.unique(cluster, axis = 0))
+                    self.ohm1 = self.u1 @ t(self.u1)*ncl1/(ncl1-1)*(self.n-1)/self.df
+                    self.ohm2 = self.u1 @ t(self.u1)*ncl2/(ncl2-1)*(self.n-1)/self.df
+                    self.ohm12 = self.u1 @ t(self.u1)*ncl12/(ncl12-1)*(self.n-1)/self.df
+                    print("Retrieving First VCE")
+                    for i in range(self.n):
+                        for j in range(self.n):
+                            if cluster.iloc[i,0] != cluster.iloc[j,0]:
+                                self.ohm1[i][j] = 0
+                    print("Retrieving Second VCE")
+                    for i in range(self.n):
+                        for j in range(self.n):
+                            if cluster.iloc[i,1] != cluster.iloc[j,1]:
+                                self.ohm2[i][j] = 0
+                    print("Retrieving Third VCE")
+                    if ncl12 == self.n:
+                        d1 = np.diag(self.ohm12)
+                        self.ohm12 = d1 * np.identity(self.n)
+                    else:
+                        for i in range(self.n):
+                            for j in range(self.n):
+                                if np.any(cluster.iloc[i] != cluster.iloc[j]):
+                                    self.ohm12[i][j] = 0
+                    self.ohm = self.ohm1 + self.ohm2 - self.ohm12
+                else: 
+                    print("Supports up to two way clustering only!")
             else:
                 print("Incomplete Cluster ID!")
                 print("HC1 Assumed")
@@ -102,6 +135,16 @@ class OLS(object):
                     self.ohm[i][i] = self.u2[i]
             self.XOX = self.Xt @ self.ohm @ self.X
             self.Varb = self.VarX @ self.XOX @ self.VarX
+            if np.any(np.diag(self.Varb) < 0):
+                print("Non Positive Semi-Definite VCE Matrix! Cameron, Gelbach & Miller (2011) Transformation Used")
+                lb, vb = eigh(self.Varb)
+                idx = lb.argsort()[::-1]
+                vb = vb[:,idx]
+                lb = lb[idx]
+                for i in range(len(lb)):
+                    lb[i] = max(0, lb[i])
+                diag = lb * np.identity(len(lb))
+                self.Varb = vb @ diag @ t(vb)
         self.SEb = np.sqrt(np.diag(self.Varb))
         if nocons == False:
             self.ypred = m(self.X, self.b) - np.mean(self.dep)
@@ -162,7 +205,7 @@ class OLS(object):
             if self.pvalue[j] < 0.05:
                 self.mout[j, 4] = 0.05
             else: 
-                self.mout[j, 4] = 0
+                self.mout[j, 4] = None
         self.out = pd.DataFrame(data = self.mout, 
                                 index = self.varlist,
                                 columns = ['Coefficient', 'S.E', 't', 'p-value', 'Sig'], dtype = float)
@@ -212,7 +255,7 @@ class Ridge(object):
         self.u2 = self.u_hat**2
         self.SSR = t(self.u_hat) @ self.u_hat
         self.SE = self.SSR/float(self.df)
-        self.Varb = self.SE * self.VarX #default
+        self.Varb = self.SE * (self.VarX @ self.Xt @ self.X @ self.VarX) #default
         if vce == None:
             vce = ""
         if vce.upper() == "ROBUST":
@@ -235,14 +278,45 @@ class Ridge(object):
                             self.XOX[i][j] = 0
             self.Varb = self.VarX @ self.XOX @ self.VarX
         if np.any(cluster) != None:
-            ncl = len(np.unique(cluster))
-            self.ohm = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
             if np.all(cluster) != None:
                 print("Cluster ID Retrieved!")
-                for i in range(self.n):
-                    for j in range(self.n):
-                        if cluster.iloc[i] != cluster.iloc[j]:
-                            self.ohm[i][j] = 0
+                if cluster.shape[1] == 1:
+                    ncl = len(np.unique(cluster))
+                    self.ohm = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
+                    for i in range(self.n):
+                        for j in range(self.n):
+                            if np.all(cluster.iloc[i] != cluster.iloc[j]):
+                                self.ohm[i][j] = 0
+                elif cluster.shape[1] == 2:
+                    print("Twoway clustering: ", cluster.columns)
+                    ncl1 = len(np.unique(cluster.iloc[:,0]))
+                    ncl2 = len(np.unique(cluster.iloc[:,1]))
+                    ncl12 = len(np.unique(cluster, axis = 0))
+                    self.ohm1 = self.u1 @ t(self.u1)*ncl1/(ncl1-1)*(self.n-1)/self.df
+                    self.ohm2 = self.u1 @ t(self.u1)*ncl2/(ncl2-1)*(self.n-1)/self.df
+                    self.ohm12 = self.u1 @ t(self.u1)*ncl12/(ncl12-1)*(self.n-1)/self.df
+                    print("Retrieving First VCE")
+                    for i in range(self.n):
+                        for j in range(self.n):
+                            if cluster.iloc[i,0] != cluster.iloc[j,0]:
+                                self.ohm1[i][j] = 0
+                    print("Retrieving Second VCE")
+                    for i in range(self.n):
+                        for j in range(self.n):
+                            if cluster.iloc[i,1] != cluster.iloc[j,1]:
+                                self.ohm2[i][j] = 0
+                    print("Retrieving Third VCE")
+                    if ncl12 == self.n:
+                        d1 = np.diag(self.ohm12)
+                        self.ohm12 = d1 * np.identity(self.n)
+                    else:
+                        for i in range(self.n):
+                            for j in range(self.n):
+                                if np.any(cluster.iloc[i] != cluster.iloc[j]):
+                                    self.ohm12[i][j] = 0
+                    self.ohm = self.ohm1 + self.ohm2 - self.ohm12
+                else: 
+                    print("Supports up to two way clustering only!")
             else:
                 print("Incomplete Cluster ID!")
                 print("HC1 Assumed")
@@ -252,6 +326,16 @@ class Ridge(object):
                     self.ohm[i][i] = self.u2[i]
             self.XOX = self.Xt @ self.ohm @ self.X
             self.Varb = self.VarX @ self.XOX @ self.VarX
+            if np.any(np.diag(self.Varb) < 0):
+                print("Non Positive Semi-Definite VCE Matrix! Cameron, Gelbach & Miller (2011) Transformation Used")
+                lb, vb = eigh(self.Varb)
+                idx = lb.argsort()[::-1]
+                vb = vb[:,idx]
+                lb = lb[idx]
+                for i in range(len(lb)):
+                    lb[i] = max(0, lb[i])
+                diag = lb * np.identity(len(lb))
+                self.Varb = vb @ diag @ t(vb)
         self.SEb = np.sqrt(np.diag(self.Varb))
         if nocons == False:
             self.ypred = m(self.X, self.b) - np.mean(self.dep)
@@ -312,7 +396,7 @@ class Ridge(object):
             if self.pvalue[j] < 0.05:
                 self.mout[j, 4] = 0.05
             else: 
-                self.mout[j, 4] = 0
+                self.mout[j, 4] = None
         self.out = pd.DataFrame(data = self.mout, 
                                 index = self.varlist,
                                 columns = ['Coefficient', 'S.E', 't', 'p-value', 'Sig'], dtype = float)
@@ -325,6 +409,11 @@ class Ridge(object):
               float(self.SE), 
               float(self.R2), 
               float(self.AR2)))
+        try:
+            len(self.k)
+            print("Length k = {}, Mean k = {}, SD k = {}".format(len(self.k), np.nean(self.k), np.std(self.k)))
+        except:
+            print("k = {}".format(self.k))
         print("-----------------------")
         print("Coefficients")
         print("-----------------------")
