@@ -4,7 +4,7 @@ Ridge Regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (
 
 Estimations of variables are based on: Econometric Theory and Methods, Davidson and Mackinnon (2004)
 
-This is a substitute to STATA not being able to perform Ridge. Although there are packages available but Python is still more flexible than STATA, especially when you want to relax for heteroskedasticity, do more flexible tests etc. 
+This is a substitute to STATA not being able to perform Ridge according to the papers. Although there are packages available but Python is still more flexible than STATA, especially when you want to relax for heteroskedasticity, do more flexible tests etc. 
 
 Also you can access to all the estimations, from residuals to the Omega matrix. 
 
