@@ -37,10 +37,6 @@ Test function is there to do F-test under Homoskedasticity. Takes 4 arguments: y
 
 lag function is basically there to create lag values for time series analysis returns the dataframe of the lagged value. 
 
-Please contact me by 
-cai.ming@live.com 
-if you have any questions. 
-
 ----------------------------
 Jan 24: 
 
@@ -49,3 +45,6 @@ Supports HC1 and HC2 Robust Standard Errors
 Jan 25:
 
 Supports clustered standard errors
+
+Feb 1:
+Supports twoway clustering (multiway clustering takes a long time), clusters inputs should be in series/dataframes as well. Please use cluster or vce separately. 
