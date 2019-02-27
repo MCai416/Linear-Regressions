@@ -5,13 +5,6 @@ Created on Tue Jan 15 14:43:18 2019
 @author: Ming Cai
 """
 
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Dec 23 11:14:15 2018
-
-@author: Ming Cai
-"""
-
 import numpy as np
 from numpy.linalg import inv
 from numpy import matmul as m
