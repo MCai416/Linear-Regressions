@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jan 15 14:43:18 2019
+Created on Sun Dec 23 11:14:15 2018
 
 @author: Ming Cai
 """
@@ -18,7 +18,7 @@ mpl.rcParams['font.size'] = 30
 pd.options.display.float_format = '{:,.4g}'.format
 
 #####################################################################
-def clearNaN(DataFrameY, DataFrameX): # to clear out NaN variables, which are invalid observations
+def clearNaN(DataFrameY, DataFrameX): # to clear out NaN variables for both X and y, which are invalid observations
     l = len(DataFrameY)
     for i in range(l):
         drop = False
@@ -41,8 +41,9 @@ def lag(df, l, name = None):
     return pd.DataFrame(ldf, columns = [name])
 
 class OLS(object):
-    def __init__(self, y, X, nocons = False, vce = None, cluster = None):
+    def __init__(self, y, X, nocons = False, vce = None, cluster = None, gls = False):
         y, X = clearNaN(y, X) # get rid of null obs
+        self.gls = gls
         self.depname = y.name 
         self.nocons = nocons 
         self.n = len(y) 
@@ -63,7 +64,7 @@ class OLS(object):
         self.SSR = t(self.u_hat) @ self.u_hat # get SSR
         self.SE = self.SSR/float(self.df) # get sigma_u estimate
         self.Varb = self.SE * self.VarX #default 
-        #Heteroskedasticity/Clustered/ Serial Correlation works below 
+        #Heteroskedasticity/Clustered/Serial Correlation works below 
         if vce == None:
             vce = ""
         if vce.upper() == "ROBUST":
@@ -80,43 +81,51 @@ class OLS(object):
                self.ohm[i][i] = self.u2[i]
             self.XOX = self.Xt @ self.ohm @ self.X
             self.Varb = self.VarX @ self.XOX @ self.VarX
-        if np.any(cluster) != None:
-            if np.all(cluster) != None:
+        if np.all(np.any(cluster) != None):
+            if np.all(np.all(cluster) != None):
                 print("Cluster ID Retrieved!")
-                if cluster.shape[1] == 1:
+                try:
+                    clsize = cluster.shape[1] 
+                except: 
+                    clsize = 1
+                if clsize == 1:
                     ncl = len(np.unique(cluster))
-                    self.ohm = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
+                    self.o1 = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
+                    self.ohm = np.zeros(self.o1.shape)
                     for i in range(self.n):
                         for j in range(self.n):
-                            if np.all(cluster.iloc[i] != cluster.iloc[j]):
-                                self.ohm[i][j] = 0
-                elif cluster.shape[1] == 2:
+                            if np.all(cluster.iloc[i] == cluster.iloc[j]):
+                                self.ohm[i][j] = self.o1[i][j]
+                elif clsize == 2:
                     print("Twoway clustering: ", cluster.columns)
                     ncl1 = len(np.unique(cluster.iloc[:,0]))
                     ncl2 = len(np.unique(cluster.iloc[:,1]))
                     ncl12 = len(np.unique(cluster, axis = 0))
-                    self.ohm1 = self.u1 @ t(self.u1)*ncl1/(ncl1-1)*(self.n-1)/self.df
-                    self.ohm2 = self.u1 @ t(self.u1)*ncl2/(ncl2-1)*(self.n-1)/self.df
-                    self.ohm12 = self.u1 @ t(self.u1)*ncl12/(ncl12-1)*(self.n-1)/self.df
+                    self.o1 = self.u1 @ t(self.u1)*(self.n-1)/self.df*ncl1/(ncl1-1)
+                    self.o2 = self.u1 @ t(self.u1)*(self.n-1)/self.df*ncl2/(ncl2-1)
+                    self.o12 = self.u1 @ t(self.u1)*(self.n-1)/self.df*ncl12/(ncl12-1)
+                    self.ohm1 = np.zeros(self.o1.shape)
+                    self.ohm2 = np.zeros(self.o2.shape)
+                    self.ohm12 = np.zeros(self.o12.shape)
                     print("Retrieving First VCE")
                     for i in range(self.n):
                         for j in range(self.n):
-                            if cluster.iloc[i,0] != cluster.iloc[j,0]:
-                                self.ohm1[i][j] = 0
+                            if cluster.iloc[i,0] == cluster.iloc[j,0]:
+                                self.ohm1[i][j] = self.o1[i][j]
                     print("Retrieving Second VCE")
                     for i in range(self.n):
                         for j in range(self.n):
-                            if cluster.iloc[i,1] != cluster.iloc[j,1]:
-                                self.ohm2[i][j] = 0
+                            if cluster.iloc[i,1] == cluster.iloc[j,1]:
+                                self.ohm2[i][j] = self.o2[i][j]
                     print("Retrieving Third VCE")
                     if ncl12 == self.n:
-                        d1 = np.diag(self.ohm12)
+                        d1 = np.diag(self.o12)
                         self.ohm12 = d1 * np.identity(self.n)
                     else:
                         for i in range(self.n):
                             for j in range(self.n):
-                                if np.any(cluster.iloc[i] != cluster.iloc[j]):
-                                    self.ohm12[i][j] = 0
+                                if np.any(cluster.iloc[i] == cluster.iloc[j]):
+                                    self.ohm12[i][j] = self.o12[i][j]
                     self.ohm = self.ohm1 + self.ohm2 - self.ohm12
                 else: 
                     print("Supports up to two way clustering only!")
@@ -129,6 +138,7 @@ class OLS(object):
                     self.ohm[i][i] = self.u2[i]
             self.XOX = self.Xt @ self.ohm @ self.X
             self.Varb = self.VarX @ self.XOX @ self.VarX
+            self.Varb1 = self.Varb
             if np.any(np.diag(self.Varb) < 0):
                 print("Non Positive Semi-Definite VCE Matrix! Cameron, Gelbach & Miller (2011) Transformation Used")
                 lb, vb = eigh(self.Varb)
@@ -139,6 +149,11 @@ class OLS(object):
                     lb[i] = max(0, lb[i])
                 diag = lb * np.identity(len(lb))
                 self.Varb = vb @ diag @ t(vb)
+        if self.gls == True: 
+            print("One step GLS")
+            self.VarX = inv(self.XOX)
+            self.CovXy = self.Xt @ self.ohm @ self.dep
+            self.b = self.VarX @ self.CovXy
         self.SEb = np.sqrt(np.diag(self.Varb))
         if nocons == False:
             self.ypred = m(self.X, self.b) - np.mean(self.dep)
@@ -156,7 +171,7 @@ class OLS(object):
         self.Mx = (np.identity(self.n) - self.Px)
         self.SSR1 = t(self.dep) @ self.Mx @ self.dep
         self.settest()
-    def settest(self):
+    def settest(self): #F-test against the constant as the restricted model 
         self.cons = pd.DataFrame(np.ones(self.n))
         self.uSSR = self.SSR
         if self.nocons == False:
@@ -168,7 +183,7 @@ class OLS(object):
             self.q = self.l
         self.fstat = ((self.rSSR - self.uSSR)/self.q)/(self.uSSR/self.df)
         self.pval = 1 - ss.f.cdf(self.fstat, self.q, self.df)
-    def reg(self):
+    def reg(self): #Output function, not going to output unless if est.reg()
         self.t95 = ss.t.ppf(0.975, self.df)
         self.mout = np.ndarray([len(self.b),5])
         for j in range(len(self.b)):
@@ -208,7 +223,65 @@ class OLS(object):
         print("-----------------------")
         print(self.out)
         
-        
+class PCA(object):
+    def __init__(self, dfy, dfX, numeigen = 0, minproportion = 0, vce = None, cluster = None):
+        print("PCA Regression:")
+        self.vce = vce
+        self.cluster = cluster
+        self.varlist = dfX.columns
+        self.X = dfX.values
+        self.Xt = self.X.transpose()
+        self.XtX = self.Xt @ self.X
+        self.lam, self.v = np.linalg.eigh(self.XtX)
+        idx = self.lam.argsort()[::-1]
+        self.v = self.v[:,idx]
+        self.lam = self.lam[idx]
+        self.lp = self.lam/sum(self.lam)
+        self.dfA = pd.DataFrame(self.X @ self.v, columns = np.arange(len(self.lam))+1)
+        self.l = len(self.lam)
+        if numeigen > 0 and minproportion > 0:
+            print("Error, only one is required")
+            pass
+        elif minproportion > 0:
+            proportion = 0
+            self.num = 0
+            for i in range(len(self.lp)):
+                self.num = self.num + 1
+                proportion = proportion + self.lp[i]
+                if proportion >= minproportion:
+                    break
+        elif numeigen > 0: 
+            self.num = numeigen
+        else:
+            print("Selecting all components")
+            self.num = len(self.lam)
+        print("Number of components selected: {}".format(self.num))
+        self.est = OLS(dfy, self.dfA.iloc[:,0:self.num], nocons = True, vce = self.vce, cluster = self.cluster)
+        self.g = self.est.b
+        self.SEg = self.est.SEb
+        self.b = self.v[:,0:self.num] @ self.g
+        self.Varb = self.v[:,0:self.num] @ self.est.Varb1 @ self.v[:,0:self.num].transpose()
+        if np.any(np.diag(self.Varb) < 0):
+                print("Non Positive Semi-Definite VCE Matrix! Cameron, Gelbach & Miller (2011) Transformation Used")
+                lb, vb = eigh(self.Varb)
+                idx = lb.argsort()[::-1]
+                vb = vb[:,idx]
+                lb = lb[idx]
+                for i in range(len(lb)):
+                    lb[i] = max(0, lb[i])
+                diag = lb * np.identity(len(lb))
+                self.Varb = vb @ diag @ t(vb)
+        self.SEb = np.sqrt(np.diag(self.Varb))
+        self.t = self.b/self.SEb
+        self.pval = 2*ss.t.cdf(-abs(self.t), self.est.df)
+    def reg(self):
+        self.out1 = pd.DataFrame(np.transpose([self.g, self.SEg]), columns = ["Coefficient", "SE"])
+        self.out2 = pd.DataFrame(np.transpose([self.b, self.SEb, self.t, self.pval]),columns = ["Coefficient", "SE", "t", "p-value"], index = self.varlist)
+        print("PCA Regression:")
+        print(self.out1)
+        print("Beta coefficient values:")
+        print(self.out2)
+
 class Ridge(object):
     def __init__(self, y, X, k = 0, nocons = False, vce = None, cluster = None):
         y, X = clearNaN(y, X)
@@ -216,13 +289,28 @@ class Ridge(object):
         self.nocons = nocons
         self.X0 = X
         self.k = k
+        try: 
+            self.klength = len(self.k)
+            print("Using separated Ridge paramters for each eigenvalue")
+        except:
+            self.klength = 1
+            print("Using constant Ridge paramter for each eigenvalue")
         self.n = len(y)
         self.l = X.shape[1]
         self.dep = np.array(y.values, dtype = float)
         self.X = X.values
         self.Xt = t(self.X)
         self.varlist = X.columns
-        self.VarX = inv(self.Xt @ self.X + self.k * np.identity(self.l))
+        if self.klength == 1:
+            self.VarX = inv(self.Xt @ self.X + self.k * np.identity(self.l))
+        elif self.klength > 1:
+            self.lam, self.vec = eigh(self.Xt @ self.X)
+            idx = self.lam.argsort()[::-1]
+            self.vec = self.vec[:,idx]
+            self.lam = self.lam[idx]
+            self.lam1 = self.lam + self.k
+            self.D = self.lam1 * np.identity(self.l)
+            self.VarX = self.vec @ inv(self.D) @ self.vec.transpose()
         self.VarXOLS = inv(self.Xt @ self.X)
         self.Px = self.X @ self.VarX @ self.Xt
         self.Mx = np.identity(self.n) - self.Px
@@ -257,43 +345,53 @@ class Ridge(object):
                         if cluster.iloc[i] != cluster.iloc[j]:
                             self.XOX[i][j] = 0
             self.Varb = self.VarX @ self.XOX @ self.VarX
-        if np.any(cluster) != None:
-            if np.all(cluster) != None:
+        if np.all(np.any(cluster) != None):
+            if np.all(np.all(cluster) != None):
                 print("Cluster ID Retrieved!")
-                if cluster.shape[1] == 1:
+                try:
+                    clsize = cluster.shape[1] 
+                except: 
+                    clsize = 1
+                if clsize == 1:
                     ncl = len(np.unique(cluster))
-                    self.ohm = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
+                    self.o1 = self.u1 @ t(self.u1)*ncl/(ncl-1)*(self.n-1)/self.df
+                    self.ohm = np.zeros(self.o1.shape) 
                     for i in range(self.n):
                         for j in range(self.n):
-                            if np.all(cluster.iloc[i] != cluster.iloc[j]):
-                                self.ohm[i][j] = 0
-                elif cluster.shape[1] == 2:
+                            if np.all(cluster.iloc[i] == cluster.iloc[j]):
+                                self.ohm[i][j] = self.o1[i][j]
+                elif clsize == 2:
                     print("Twoway clustering: ", cluster.columns)
                     ncl1 = len(np.unique(cluster.iloc[:,0]))
                     ncl2 = len(np.unique(cluster.iloc[:,1]))
                     ncl12 = len(np.unique(cluster, axis = 0))
-                    self.ohm1 = self.u1 @ t(self.u1)*ncl1/(ncl1-1)*(self.n-1)/self.df
-                    self.ohm2 = self.u1 @ t(self.u1)*ncl2/(ncl2-1)*(self.n-1)/self.df
-                    self.ohm12 = self.u1 @ t(self.u1)*ncl12/(ncl12-1)*(self.n-1)/self.df
+                    self.o1 = self.u1 @ t(self.u1)*(self.n-1)/self.df*ncl1/(ncl1-1)
+                    self.o2 = self.u1 @ t(self.u1)*(self.n-1)/self.df*ncl2/(ncl2-1)
+                    self.o12 = self.u1 @ t(self.u1)*(self.n-1)/self.df*ncl12/(ncl12-1)
+                    #reghdfe in STATA did not adjust for cluster df properly
+                    #This version is a better adjustment to cluster df
+                    self.ohm1 = np.zeros(self.o1.shape)
+                    self.ohm2 = np.zeros(self.o2.shape)
+                    self.ohm12 = np.zeros(self.o12.shape)                    
                     print("Retrieving First VCE")
                     for i in range(self.n):
                         for j in range(self.n):
-                            if cluster.iloc[i,0] != cluster.iloc[j,0]:
-                                self.ohm1[i][j] = 0
+                            if cluster.iloc[i,0] == cluster.iloc[j,0]:
+                                self.ohm1[i][j] = self.o1[i][j]
                     print("Retrieving Second VCE")
                     for i in range(self.n):
                         for j in range(self.n):
-                            if cluster.iloc[i,1] != cluster.iloc[j,1]:
-                                self.ohm2[i][j] = 0
+                            if cluster.iloc[i,1] == cluster.iloc[j,1]:
+                                self.ohm2[i][j] = self.o2[i][j]
                     print("Retrieving Third VCE")
                     if ncl12 == self.n:
-                        d1 = np.diag(self.ohm12)
+                        d1 = np.diag(self.o12)
                         self.ohm12 = d1 * np.identity(self.n)
                     else:
                         for i in range(self.n):
                             for j in range(self.n):
-                                if np.any(cluster.iloc[i] != cluster.iloc[j]):
-                                    self.ohm12[i][j] = 0
+                                if np.any(cluster.iloc[i] == cluster.iloc[j]):
+                                    self.ohm12[i][j] = self.o12[i][j]
                     self.ohm = self.ohm1 + self.ohm2 - self.ohm12
                 else: 
                     print("Supports up to two way clustering only!")
@@ -306,6 +404,7 @@ class Ridge(object):
                     self.ohm[i][i] = self.u2[i]
             self.XOX = self.Xt @ self.ohm @ self.X
             self.Varb = self.VarX @ self.XOX @ self.VarX
+            self.Varb1 = self.Varb
             if np.any(np.diag(self.Varb) < 0):
                 print("Non Positive Semi-Definite VCE Matrix! Cameron, Gelbach & Miller (2011) Transformation Used")
                 lb, vb = eigh(self.Varb)
@@ -372,54 +471,30 @@ class Ridge(object):
         print("-----------------------")
         print(self.out)
         
-def getK(est):
-    #k = est.SE/np.power(est.b, 2)
-    k = ss.stats.hmean(est.SE/np.power(est.b,2))
+def getK(est, separate = False):
+    """
+    The following separated k is not recommended but still usable 
+    """
+    XtX = est.Xt @ est.X
+    SE = est.SE
+    l, v = np.linalg.eigh(XtX)
+    idx = l.argsort()[::-1]
+    v = v[:,idx]
+    l = l[idx]
+    gamma = v.transpose() @ est.b
+    ks = SE / gamma**2
+    if separate == True:
+        k = ks
+    if separate == False: 
+        k = ss.stats.hmean(ks)
     return k 
 
-def Test(dfy, dfX, dfnull, nocons = False, k0=0, k1=0, Test0 = False):
-    estu = Ridge(dfy, dfX, k1, nocons = nocons)
-    estr = Ridge(dfy, dfnull, k0, nocons = nocons)
-    b0 = estr.b
-    b1 = estu.b
-    XtX = estu.Xt @ estu.X
-    s2 = estu.SE
-    df1 = estu.df
-    if Test0 == True:
-        q = len(dfy) - estu.df
-        Foben = (t(b1) @ XtX @ b1)/(q*s2)
-        print(q)
-    else:
-        q = estr.df - estu.df
-        print(l, q)
-        l = len(b1) - len(b0)
-        if q < 0: 
-            print("must have more or equal variables in dfx!")
-            pass
-        bdiff = np.zeros(len(b1))
-        bres = np.zeros(len(b1))
-        if q == 0:
-            bdiff = b1 - b0
-        if q > 0:
-            for i in range(len(b1)):
-                bdiff[i] = b1[i]
-                bres[i] = b1[i]
-                if i >= l:
-                    bdiff[i] = b1[i] - b0[i-l]
-                    bres[i] = 0
-        Foben = (t(bdiff) @ XtX @ bdiff)/(q*s2)
-    print("Obenchain 1977, F-statistic: {}".format(Foben))
-    Pvoben = 1 - ss.f.cdf(Foben, q, df1)
-    print("Obenchain 1977, P-value: {}".format(Pvoben))
-    uSSR = estu.SSR
-    rSSR = estr.SSR
-    if nocons == True: 
-        rSSR = np.dot(dfy.values, dfy.values)
-    F = ((rSSR - uSSR)/q)/(uSSR/df1)
-    Pvalue = 1 - ss.f.cdf(F, q, df1)
-    print("F-Test Result: ")
-    print("uSSR: {}".format(uSSR))
-    print("rSSR: {}".format(rSSR))
-    print("F-statistic: {}".format(F))
-    print("P-value: {}".format(Pvalue))
-    #estu.reg()
+def Bartlett(X):
+    corrX = np.corrcoef(X.values, rowvar = False)
+    detX = np.linalg.det(corrX)
+    lndetX = np.log(detX)
+    n, p = X.values.shape
+    bstat = -(n-1/6*(2*p+5))*lndetX
+    df = 1/2*p*(p-1)
+    Pval = 1 - ss.chi2.cdf(bstat, df)
+    print("Stat: {}, df: {}, Pval: {}".format(bstat, df, Pval))
