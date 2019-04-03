@@ -1,5 +1,4 @@
-# Ridge Regression
+# Ridge Regression and PCA
 
 Ridge Regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (1975). 
-
-Also included: PCA, by Massy (1965)
+PCA, by Massy (1965)
