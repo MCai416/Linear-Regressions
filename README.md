@@ -17,7 +17,7 @@ This programme is used to replace the STATA twoway panel standard error regressi
 
 2) Ridge regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (1975). Located in Ridge.py
 
-This includes the feature of selecting a Ridge regression bias parameter. 
+This includes the feature of selecting a Ridge regression bias parameter. Main method to reduce effects of imperfect multicollinearity. 
 
 3) PCA, by Massy (1965). Located in Ridge.py 
 
