@@ -9,7 +9,8 @@ Variable inputs require the following data types:
   Dependent Variable: Pandas Series
   
   Independent Variable: Pandas DataFrame 
-  
+
+# Descriptions 
 
 1) OLS with panel/twoway standard errors. Located in Ridge.py
 
@@ -25,15 +26,13 @@ This is used to analyse the degree of imperfect multicollinearity. Also a method
 
 4) ARMA(p,q) + Bootstrap By Franke & Kreiss. Located in Bootstrap ARMA.py 
 
-This file relies on the OLS class estimator in Ridge.py 
+This class only takes a one dimensional Pandas DataFrame sequence. 
+
+It relies on the OLS class estimator in Ridge.py 
 
 This file contains a 1000 element MA(1) test sequence with a fixed seed. 
 
-This file is separated into two parts, the first part is a two step least squares estimation (AR(infinity)+ARMA(p,q)), avoiding nonlinear optimisation or maximum likelihood assumptions. Requires stationarity assumptions. 
-
-The second part is Bootstrapping ARMA(p,q) coefficients. At first I thought that the two step LS cannot estiamte standard errors correctly. However the Bootstrap distribution indicates that the standard errors are similar to the ones estimated using LS Asymptotics. This suggests that LS Asymptotics still works even if there is dependence. 
-
-However Bootstrapping ARMA(p,q) using method in Franke and Kreiss (1992) is highly demanding in calculation. Especially when one wants 10000 bootstrap calculations. 
+This file is separated into two parts, the first part is a two step least squares estimation (AR(infinity)+ARMA(p,q)), avoiding nonlinear optimisation. Requires stationarity assumptions. The second part is Bootstrapping ARMA(p,q) coefficients. At first I thought that the two step LS cannot estiamte standard errors correctly. However the Bootstrap distribution indicates that the standard errors are similar to the ones estimated using LS Asymptotics. This suggests that LS Asymptotics still works even if there is dependence. However Bootstrapping ARMA(p,q) using method in Franke and Kreiss (1992) is highly demanding in calculation. Especially when one wants 10000 bootstrap calculations. 
 
 Not completed: 
 Vector Autoregression 
