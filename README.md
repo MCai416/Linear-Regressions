@@ -13,7 +13,7 @@ Variable inputs require the following data types:
 
 1) OLS with panel/twoway standard errors. Located in Ridge.py
 
-This programme is used to replace the STATA's twoway standard error robust regression, where I have encountered a twoway correlation in a panel data for my undergraduate dissertation. 
+This programme is used to replace STATA's twoway standard error robust regression, where I have encountered a twoway correlation in a panel data for my undergraduate dissertation. 
 
 2) Ridge regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (1975). Located in Ridge.py
 
