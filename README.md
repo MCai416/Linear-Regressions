@@ -10,7 +10,7 @@ Variable inputs require the following data types:
   
   Independent Variable: Pandas DataFrame 
 
-# Descriptions 
+# Description of regression classes 
 
 1) OLS with panel/twoway standard errors. Located in Ridge.py
 
