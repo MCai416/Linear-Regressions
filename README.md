@@ -2,7 +2,7 @@
 
 This folder contains 4 linear regression programmes I have written using Python 3. 
 
-Each estimator is a python class. The calculation is done in __init__, and the display is printed using estmator.reg(). 
+Each estimator is a python class. The calculation is done in __init__, and the results will be printed using estmator.reg(). 
 
 Variable inputs require the following data types:
 
