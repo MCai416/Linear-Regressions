@@ -52,7 +52,7 @@ class ARMA(object):
         #AR(P)
         if self.p>0 and self.q == 0:
             self.X = lag(self.series, self.p)
-            self.out = OLS(self.series[df.columns[0]], self.X) 
+            self.out = OLS(self.series[series.columns[0]], self.X) 
         elif self.p<=0 and self.q <= 0:
             print('p or q must be greater than 0!')
         elif self.p>=series.shape[0] or self.q >= series.shape[0]:
