@@ -24,9 +24,13 @@ def clearNaN(DataFrameY, DataFrameX): # to clear out NaN variables for both X an
         drop = False
         if pd.isnull(np.any(DataFrameY.iloc[l-i-1])):
             drop = True
-        for j in range(DataFrameX.shape[1]):
-            if pd.isnull(DataFrameX.iloc[l-i-1,j]):
-                drop = True
+        try: 
+            for j in range(DataFrameX.shape[1]):
+                if pd.isnull(DataFrameX.iloc[l-i-1,j]):
+                    drop = True 
+        except: 
+            if pd.isnull(DataFrameX.iloc[l-i-1]):
+                drop = True    
         if drop == True:
             DataFrameX = DataFrameX.drop(DataFrameX.index[l-i-1])
             DataFrameY = DataFrameY.drop(DataFrameY.index[l-i-1])
@@ -40,12 +44,15 @@ def lag(df, l, name = None):
     return pd.DataFrame(ldf, columns = [name])
 
 class OLS(object):
-    def __init__(self, y, X, nocons = False, vce = None, cluster = None, gls = False):
+    def __init__(self, y, X, nocons = False, vce = "ROBUST", cluster = None, gls = False):
         y, X = clearNaN(y, X) # get rid of null obs
         self.gls = gls
         self.depname = y.name 
         self.nocons = nocons 
         self.n = len(y) 
+        if nocons == False: 
+            cons = pd.Series(np.ones(self.n), index = X.index, name = "Cons")
+            X = pd.concat([X, cons], axis = 1)
         self.l = X.shape[1]
         self.dep = np.array(y.values, dtype = float)
         self.X = X.values
@@ -170,17 +177,23 @@ class OLS(object):
         self.Mx = (np.identity(self.n) - self.Px)
         self.SSR1 = t(self.dep) @ self.Mx @ self.dep
         self.settest()
-    def settest(self): #F-test against the constant as the restricted model 
+    def settest(self): #F-test against the constant as the restricted model  
         self.cons = pd.DataFrame(np.ones(self.n))
-        self.uSSR = self.SSR
+        self.uSSR = self.SSR        
         if self.nocons == False:
-            self.depdemean = (self.dep - np.mean(self.dep))
-            self.rSSR = np.dot(self.depdemean, self.depdemean)
             self.q = self.l-1
+            self.depdemean = (self.dep - np.mean(self.dep))
+            self.rSSR = np.dot(self.depdemean, self.depdemean) 
+            self.c = self.b[:self.q].reshape(self.q, 1)
+            self.vartest = self.Varb[:self.q, :self.q]
         if self.nocons == True:
-            self.rSSR = np.dot(self.dep, self.dep)
             self.q = self.l
-        self.fstat = ((self.rSSR - self.uSSR)/self.q)/(self.uSSR/self.df)
+            self.rSSR = np.dot(self.dep, self.dep) 
+            self.c = self.b.reshape(self.l, 1)
+            self.vartest = self.Varb
+        self.fstat = (self.c.transpose() @ np.linalg.inv(self.vartest) @ self.c)[0,0]
+        self.fstat1 = ((self.rSSR - self.uSSR)/self.q)/(self.uSSR/self.df) 
+        #print("Old: {:.4f}, New {:.4f}".format(self.fstat, self.fstat1)) 
         self.pval = 1 - ss.f.cdf(self.fstat, self.q, self.df)
     def reg(self): #Output function, not going to output unless if est.reg()
         self.t95 = ss.t.ppf(0.975, self.df)

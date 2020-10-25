@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt 
 from LinRegModule import OLS 
+import scipy.stats as ss
 
 #MA1 setup Test sequence 
 
@@ -52,7 +53,7 @@ class ARMA(object):
         #AR(P)
         if self.p>0 and self.q == 0:
             self.X = lag(self.series, self.p)
-            self.out = OLS(self.series[series.columns[0]], self.X) 
+            self.out = OLS(self.series[series.columns[0]], self.X, nocons = True) 
         elif self.p<=0 and self.q <= 0:
             print('p or q must be greater than 0!')
         elif self.p>=series.shape[0] or self.q >= series.shape[0]:
@@ -61,7 +62,7 @@ class ARMA(object):
             p1 = np.max([1, np.min([np.sqrt(self.series.shape[0]),20])]) 
             self.lagarp1x = lag(self.series, p1)
             y1 = pd.Series(self.series.values.transpose()[0], index = self.series.index, name = self.series.columns[0])
-            self.estARP = OLS(y1, self.lagarp1x) 
+            self.estARP = OLS(y1, self.lagarp1x, nocons = True) 
             self.res = pd.DataFrame(self.estARP.u_hat, columns = ['Residuals'])
             if self.p == 0: 
                 self.lagmaqx = lag(self.res, self.q) 
@@ -70,7 +71,7 @@ class ARMA(object):
                 nans = np.ndarray([ylen-Xlen,q])*np.nan
                 dfnan = pd.DataFrame(nans, columns = self.lagmaqx.columns)
                 self.X = self.lagmaqx.append(dfnan, ignore_index = True)
-                self.out = OLS(y1, self.X) 
+                self.out = OLS(y1, self.X, nocons = True) 
             else:
                 temparpx = lag(self.series, self.p)
                 self.lagarpx = pd.DataFrame(temparpx.values, columns = temparpx.columns, index = np.arange(0, temparpx.shape[0]))
@@ -81,13 +82,14 @@ class ARMA(object):
                 dfnan = pd.DataFrame(nans, columns = self.lagmaqx.columns)
                 self.X = self.lagmaqx.append(dfnan, ignore_index = True)
                 self.X = pd.concat([self.lagarpx, self.X], axis = 1)
-                self.out = OLS(y1, self.X) 
+                self.out = OLS(y1, self.X, nocons = True) 
 
 class CORT(object): #Cochrane - Orcutt 
-    def __init__(self, y, X, p = 1, n_iter = 1, vce = 'robust'): 
-        self.y = y
-        self.X = X
-        self.out = OLS(self.y, self.X, vce = vce) 
+    def __init__(self, y, X, p = 1, n_iter = 1, vce = 'robust', nocons = False): 
+        self.y = y 
+        self.X = pd.DataFrame(X.values, index = X.index) 
+        self.nocons = nocons
+        self.out = OLS(self.y, self.X, vce = vce, nocons = nocons) 
         try:
             k = self.X.shape[1] 
         except: 
@@ -104,7 +106,7 @@ class CORT(object): #Cochrane - Orcutt
             else: 
                 self.y_lag = lag(self.y, 1).values * self.rho[0]
             self.diffy = pd.Series(self.y.values - self.y_lag, index = self.y.index, name = self.y.name) 
-            print("Iteration: {0}, rho = {1:.4f}".format(j+1, self.rho[0]))
+            #print("Iteration: {0}, rho = {1:.4f}".format(j+1, self.rho[0]))
             # if t < 1.96 break 
             if p > 1: 
                 X_lag = lag(self.X.iloc[:,0], p).values @ self.rho 
@@ -118,8 +120,39 @@ class CORT(object): #Cochrane - Orcutt
                     else: 
                         X_lag = lag(self.X.iloc[:,i], 1).values * self.rho[0]
                     self.diffX = pd.concat([self.diffX, pd.DataFrame(self.X.values[:,i] - X_lag, index = self.X.index, columns = [self.X.columns[i]])], axis = 1)
-            self.out = OLS(self.diffy, self.diffX, vce = vce) 
-
+            self.out = OLS(self.diffy, self.diffX, vce = vce, nocons = nocons) 
+    def sumstat(self): 
+        self.u = self.y.values - self.X.values @ self.out.b[:self.out.l-1] - self.out.b[self.out.l-1]/(1-np.sum(self.rho))
+        self.u2 = self.u**2 
+        self.SSR = np.sum(self.u2) 
+        self.SE = self.SSR/float(self.out.df) 
+        if self.nocons == True: 
+            self.c = self.out.b.reshape(self.out.l, 1)
+            self.vartest = self.Varb 
+            self.TSS = self.y @ self.y 
+        if self.nocons == False: 
+            self.c = self.out.b[:self.out.q].reshape(self.out.q, 1)
+            self.vartest = self.out.Varb[:self.out.q, :self.out.q] 
+            self.TSS = (self.y - np.mean(self.y)) @ (self.y - np.mean(self.y))
+        self.R2 = 1 - self.SSR/self.TSS 
+        self.AR2 = 1 - (1-self.R2)*float(self.out.n-1)/float(self.out.df)
+        self.fstat = (self.c.transpose() @ np.linalg.inv(self.vartest) @ self.c)[0,0]
+        self.pval = 1 - ss.f.cdf(self.fstat, self.out.q, self.out.df)
+        print("-----------------------")
+        print("Summary Statistics")
+        print("-----------------------")
+        print("Sum rho = {:.4f}".format(np.sum(self.rho)))
+        print("SSR = {0:4.2f} \nSE = {1:.4f} \nR-sq = {2:.4g} \nAdj. R-sq = {3:.4g}".format(float(self.SSR), 
+              float(self.SE), 
+              float(self.R2), 
+              float(self.AR2)))
+        print("F-statistic = {0:.4f}".format(float(self.fstat)))
+        if self.pval < 0.0001:
+            print("F: P-value < 0.0001")
+        else:
+            print("F: P-value = %.4f"%(float(self.pval)))
+        print("-----------------------")
+        
 class VAR(object):
     def __init__(self,series,p):  
         self.len = series.shape[1] 
