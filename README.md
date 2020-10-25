@@ -18,6 +18,8 @@ Inside LinRegModule:
 
 This programme is used to replace STATA's twoway standard error robust regression, where I have encountered a twoway correlation in a panel data for my undergraduate dissertation. 
 
+For OLS, constants are included in X automatically unless if nocons option is True 
+
 2) Ridge regression based on Hoerl and Kennard (1970) and Hoerl, Kennard, Baldwin (1975). Located in Ridge.py
 
 This includes the feature of adding a Ridge regression bias parameter into the regression. Main method to reduce effects of imperfect multicollinearity. 
