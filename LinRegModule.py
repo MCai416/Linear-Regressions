@@ -295,7 +295,7 @@ class PCA(object):
         print(self.out2)
 
 class Ridge(object):
-    def __init__(self, y, X, k = 0, nocons = False, vce = None, cluster = None):
+    def __init__(self, y, X, k = 0, nocons = False, vce = "ROBUST", cluster = None):
         y, X = clearNaN(y, X)
         self.depname = y.name
         self.nocons = nocons
@@ -308,6 +308,10 @@ class Ridge(object):
             self.klength = 1
             print("Using constant Ridge paramter for each eigenvalue")
         self.n = len(y)
+        
+        if nocons == False: 
+            cons = pd.Series(np.ones(self.n), index = X.index, name = "Cons")
+            X = pd.concat([X, cons], axis = 1)
         self.l = X.shape[1]
         self.dep = np.array(y.values, dtype = float)
         self.X = X.values
@@ -473,7 +477,7 @@ class Ridge(object):
               float(self.SE), 
               float(self.R2), 
               float(self.AR2)))
-        try:
+        try: 
             len(self.k)
             print("Length k = {}, Mean k = {}, SD k = {}".format(len(self.k), np.nean(self.k), np.std(self.k)))
         except:
